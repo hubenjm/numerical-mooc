@@ -11,7 +11,7 @@ gamma = 1.4 #parameter for computing pressure
 
 def compute_u_i(a, b, barrier, nx, params):
 	"""
-	Generates initial values of density, velocity, pressure at each point in space
+	Generates initial values of vector u at each point in space
 	
 	Parameters
 	----------
@@ -45,19 +45,20 @@ def compute_f(u):
 	Parameters
 	----------
 	u	: array of floats
-			3 by nx array of values of rho, rho*vel, rho*e_T
+			3 by n array of values of rho, rho*vel, rho*e_T
 			
 	Returns
 	-------
 	f		: array of floats
-			3 by nx array with columns [rho*vel, rho*vel**2 + p, (rho*e_T + p)*vel]
+			3 by n array with columns [rho*vel, rho*vel**2 + p, (rho*e_T + p)*vel]
 			where e_T = p/((gamma-1)*rho) + 0.5*vel**2	
 	"""
 	
 	f = numpy.zeros_like(u)
+	p = (gamma - 1)*(u[2,:] - 0.5*(u[1,:]**2)/u[0,:])
 	f[0,:] = u[1,:]
-	f[1,:] = (u[1,:]**2)/u[0,:] + (gamma - 1)*(u[2,:] - 0.5*(u[1,:]**2)/u[0,:])
-	f[2,:] = (u[1,:]/u[0,:])*(u[2,:] + (gamma - 1)*(u[2,:] - 0.5*(u[1,:]**2)/u[0,:]))
+	f[1,:] = (u[1,:]**2)/u[0,:] + p
+	f[2,:] = (u[1,:]/u[0,:])*(u[2,:] + p)
 	
 	return f
 	
@@ -92,21 +93,20 @@ def richtmyer(u, nt, dt, dx):
 	u3[:,:] = u[2,:].copy()
 	
 	f_n = compute_f(u)
-	u_half = numpy.zeros_like(u)
-	f_half = numpy.zeros_like(u)
+	u_half = numpy.zeros((3,nx-1))
+	f_half = numpy.zeros((3,nx-1))
 	u_n = numpy.zeros_like(u)
 	u_n[:,:] = u.copy()
 	
 	for t in range(1,nt):
-		u_half[:,:-1] = 0.5*(u[:,1:] - u[:,:-1]) - dt/(2*dx)*(f_n[:,1:] - f_n[:,:-1])
-		u_half[:,-1] = u[:,-1]
+		u_half[:,:] = 0.5*(u[:,1:] + u[:,:-1]) - dt/(2.0*dx)*(f_n[:,1:] - f_n[:,:-1])
 		f_half = compute_f(u_half)
-		u_n[:,:-1] = u[:,:-1] - (dt/dx)*(f_half[:,1:] - f_half[:,:-1])
+		u_n[:,1:-1] = u[:,1:-1] - (dt/dx)*(f_half[:,1:] - f_half[:,:-1])
 		u[:,:] = u_n.copy()
 		f_n = compute_f(u_n)
-		u1[t,:] = u_n[0,:]
-		u2[t,:] = u_n[1,:]
-		u3[t,:] = u_n[2,:]
+		u1[t,:] = u[0,:].copy()
+		u2[t,:] = u[1,:].copy()
+		u3[t,:] = u[2,:].copy()
 		
 	return u1,u2,u3	
 		 
@@ -115,18 +115,41 @@ def main():
 	a = -10.0
 	b = 10.0
 	barrier = 0.0
-	params = numpy.array([1.,0.,100., 0.125, 0., 10.])
-	dt = 0.01
-	nt = 10
-	nx = 200
+	params = numpy.array([1.,0.,100000., 0.125, 0., 10000.])
+	dt = 0.0002
+	nt = 51
+	nx = 81
 	dx = (b-a)/(nx-1)
+
+	
+	#compute index at x = 2.5 meters
+	i = 5*nx/8
 	
 	u_initial = compute_u_i(a, b, barrier, nx, params)
 	u1,u2,u3 = richtmyer(u_initial, nt, dt, dx)
+
+	fig = pyplot.figure()
+	ax = pyplot.axes(xlim=(a,b), ylim=(0,5),xlabel=('Position'),ylabel=('Density'))
+	line, = ax.plot([],[],color='#003366', lw=2)
+
+	def animate(data):
+		x = numpy.linspace(a,b,nx)
+		y = data
+		line.set_data(x,y)
+		return line,
+
+	anim = animation.FuncAnimation(fig, animate, frames=u1, interval=50)
+	pyplot.show()
 	
-	#compute density, velocity, pressure from u
+	print(u1.shape)
+	print(u1[:,i])
 	
-	print(u1)
+	rho = u1[-1,i]
+	vel = u2[-1,i]/rho
+	pressure = (gamma-1)*(u3[-1,i] - 0.5*rho*vel**2)
+	print(vel)
+	print(pressure)
+	print(rho)
 
 if __name__ == "__main__":
 	main()

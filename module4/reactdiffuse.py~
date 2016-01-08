@@ -1,0 +1,45 @@
+import numpy
+from matplotlib import pyplot
+from matplotlib import rcParams
+from matplotlib import cm
+
+rcParams['font.family'] = 'serif'
+rcParams['font.size'] = 16
+
+
+def ftcs_rd_neumann(U, V, Du, Dv, F, k, q, nt, dt, dx, dy):
+
+    for n in range(nt):
+        Un = U.copy()
+        Vn = V.copy()
+        T[1:-1,1:-1] = Tn[1:-1,1:-1] + alpha *\
+            (dt/dy**2 * (Tn[2:,1:-1] - 2*Tn[1:-1,1:-1] + Tn[:-2,1:-1]) +\
+             dt/dx**2 * (Tn[1:-1,2:] - 2*Tn[1:-1,1:-1] + Tn[1:-1,:-2]))
+  
+        # Enforce Neumann BCs
+        T[-1,:] = T[-2,:]
+        T[:,-1] = T[:,-2]
+        
+        # Check if we reached T=70C
+        if T[j_mid, i_mid] >= 70:
+            print ("Center of plate reached 70C at time {0:.2f}s.".format(dt*n))
+            break
+        
+    if T[j_mid, i_mid]<70:
+        print ("Center has not reached 70C yet, it is only {0:.2f}C.".format(T[j_mid, i_mid]))
+        
+    return T
+    
+
+uvinitial = numpy.load('./data/uvinitial.npz')
+U = uvinitial['U']
+V = uvinitial['V']
+
+fig = pyplot.figure(figsize=(8,5))
+pyplot.subplot(121)
+pyplot.imshow(U, cmap = cm.RdBu)
+pyplot.xticks([]), pyplot.yticks([]);
+pyplot.subplot(122)
+pyplot.imshow(V, cmap = cm.RdBu)
+pyplot.xticks([]), pyplot.yticks([]);
+
